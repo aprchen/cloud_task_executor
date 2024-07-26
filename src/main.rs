@@ -1,39 +1,72 @@
 mod executor;
+mod cloud_providers;
 
-use executor::Executor;
-use crate::executor::Task;
+use executor::{Executor, Task, WrapperFn};
+use std::sync::Arc;
+use std::any::Any;
+use serde_json::Value;
+
+struct DbConnection {
+    connection_string: String,
+}
 
 #[tokio::main]
 async fn main() {
     let mut executor = Executor::new();
 
     executor.register_context_initializer(|ctx| {
-        // 注册一些实例，比如数据库连接
-        ctx.lock().unwrap().insert("db_connection".to_string(), "DB Connection String".to_string());
+        let db_conn = DbConnection {
+            connection_string: "DB Connection String".to_string(),
+        };
+        ctx.lock().unwrap().initializers.insert("db_connection".to_string(), Arc::new(db_conn) as Arc<dyn Any + Send + Sync>);
     });
 
-    executor.register_task(Task::new("task1", |ctx| {
-        Box::pin(async move {
-            // 使用 context 获取数据库连接
-            let db_conn = ctx.lock().unwrap().get("db_connection").cloned().unwrap_or_default();
-            println!("Task 1 is running with DB connection: {}", db_conn);
-            Ok("Task 1 result".to_string())
+    // 定义一个简单的包装函数，修改传入的参数
+    let param_wrapper: WrapperFn = Arc::new(|task_fn| {
+        Arc::new(move |ctx, mut payload| {
+            payload["payload_key"] = Value::String("modified_value".to_string());
+            task_fn(ctx, payload)
         })
-    }));
+    });
 
-    executor.register_task(Task::new("task2", |ctx| {
-        Box::pin(async move {
-            // 使用 context 获取数据库连接
-            let db_conn = ctx.lock().unwrap().get("db_connection").cloned().unwrap_or_default();
-            println!("Task 2 is running with DB connection: {}", db_conn);
-            Ok("Task 2 result".to_string())
+    // 定义一个简单的包装函数，修改返回结果
+    let result_wrapper: WrapperFn = Arc::new(|task_fn| {
+        Arc::new(move |ctx, payload| {
+            let task_fn = task_fn.clone();
+            Box::pin(async move {
+                let mut result = task_fn(ctx, payload).await?;
+                result = format!("{} - modified", result).into();
+                Ok(result)
+            })
         })
-    }));
+    });
 
-    executor.register_post_executor(|ctx, result| {
-        // 处理任务结果，比如发送通知
-        if let Ok(res) = result {
-            println!("Task completed with result: {:?}", res);
+
+    // 注册任务，并应用包装函数
+    executor.register_task(
+        Task::new("my_task", |ctx, payload| {
+            Box::pin(async move {
+                let binding = ctx.lock().unwrap();
+                let db_conn = binding.initializers.get("db_connection")
+                    .and_then(|conn| conn.downcast_ref::<DbConnection>())
+                    .expect("DB connection not found");
+                let payload_str = payload.get("payload_key").and_then(Value::as_str).unwrap_or("default_value");
+                println!("Task running with DB connection: {}, payload: {}", db_conn.connection_string, payload_str);
+                Ok("Task result".to_string())
+            })
+        })
+            .with_wrapper(param_wrapper)
+            .with_wrapper(result_wrapper)
+    );
+
+    executor.register_post_executor(|ctx| {
+        let context = ctx.lock().unwrap();
+        for (task_name, result) in &context.results {
+            let result = result.downcast_ref::<Result<String, String>>();
+            match result {
+                Some(res) => println!("Task {} completed with result: {:?}", task_name, res),
+                None => println!("Task {} result is of an unexpected type", task_name),
+            }
         }
     });
 
