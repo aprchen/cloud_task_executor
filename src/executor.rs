@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use crate::cloud_providers::{create_fc_route, handle_lambda_event};
 use futures::future::BoxFuture;
-use std::any::Any;
 use lambda_runtime::{service_fn, LambdaEvent};
 use serde_json::Value;
-use crate::cloud_providers::{handle_lambda_event, create_fc_route};
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct ContextData {
@@ -13,7 +13,8 @@ pub struct ContextData {
 }
 
 pub type Context = Arc<Mutex<ContextData>>;
-pub type TaskFn = Arc<dyn Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + Send + Sync>;
+pub type TaskFn =
+    Arc<dyn Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + Send + Sync>;
 pub type ContextInitializer = Arc<dyn Fn(&Context) + Send + Sync>;
 pub type PostExecutor = Arc<dyn Fn(&Context) + Send + Sync>;
 pub type WrapperFn = Arc<dyn Fn(TaskFn) -> TaskFn + Send + Sync>;
@@ -27,8 +28,8 @@ pub struct Task {
 
 impl Task {
     pub fn new<T>(name: &str, task_fn: T) -> Self
-        where
-            T: Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + 'static + Send + Sync,
+    where
+        T: Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + 'static + Send + Sync,
     {
         Self {
             name: name.to_string(),
@@ -74,15 +75,15 @@ impl Executor {
     }
 
     pub fn register_context_initializer<C>(&mut self, initializer: C)
-        where
-            C: Fn(&Context) + 'static + Send + Sync,
+    where
+        C: Fn(&Context) + 'static + Send + Sync,
     {
         self.context_initializers.push(Arc::new(initializer));
     }
 
     pub fn register_post_executor<E>(&mut self, executor: E)
-        where
-            E: Fn(&Context) + 'static + Send + Sync,
+    where
+        E: Fn(&Context) + 'static + Send + Sync,
     {
         self.post_executors.push(Arc::new(executor));
     }
@@ -91,7 +92,10 @@ impl Executor {
         for task in &self.tasks {
             let result = task.execute(self.context.clone(), payload.clone()).await;
             let mut context = self.context.lock().unwrap();
-            context.results.insert(task.name.clone(), Arc::new(result) as Arc<dyn Any + Send + Sync>);
+            context.results.insert(
+                task.name.clone(),
+                Arc::new(result) as Arc<dyn Any + Send + Sync>,
+            );
         }
 
         // 在所有任务执行完毕后调用后处理函数
@@ -108,11 +112,11 @@ impl Executor {
         if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
             let func = service_fn(move |event: LambdaEvent<Value>| {
                 let executor = self.clone();
-                async move {
-                    handle_lambda_event(executor, event).await
-                }
+                async move { handle_lambda_event(executor, event).await }
             });
-            lambda_runtime::run(func).await.expect("Failed to run AWS Lambda function");
+            lambda_runtime::run(func)
+                .await
+                .expect("Failed to run AWS Lambda function");
         } else if std::env::var("FC_FUNC_CODE_PATH").is_ok() {
             let route = create_fc_route(self);
             warp::serve(route).run(([0, 0, 0, 0], 9000)).await;
@@ -122,5 +126,11 @@ impl Executor {
             let payload = serde_json::json!({});
             self.execute_tasks(payload).await;
         }
+    }
+}
+
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
     }
 }
