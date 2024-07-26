@@ -54,7 +54,7 @@ pub use cloud_providers::{handle_lambda_event, create_fc_route};
 pub use args::Args;
 
 // Re-export the macro
-pub use basic_macros::cte_task;
+pub use cte_basic_macros::cte_task;
 
 #[cfg(test)]
 mod tests {

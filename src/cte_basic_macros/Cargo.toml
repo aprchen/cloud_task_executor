@@ -5,7 +5,6 @@ edition = "2018"
 authors = ["aprchen <ott321@yeah.net>"]
 description = "A simple macro for generating cloud_task_executor task in Rust"
 license = "MIT"
-license-file = "LICENSE.txt"
 repository = "https://github.com/aprchen/cloud_task_executor"
 
 [lib]
