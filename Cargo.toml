@@ -9,6 +9,7 @@ repository = "https://github.com/aprchen/cloud_task_executor"
 readme = "README.md"
 keywords = ["task", "lambda", "fc", "alibaba", "aws"]
 license = "MIT"
+license-file = "LICENSE.txt"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
