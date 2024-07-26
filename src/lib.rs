@@ -17,7 +17,7 @@ mod tests {
     fn initialize_executor() -> Executor {
         let mut executor = Executor::new();
 
-        executor.set_context_initializer(|ctx| {
+        executor.set_initializer(|ctx| {
             ctx.set("sample_key", "sample_value".to_string());
         });
 

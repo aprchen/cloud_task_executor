@@ -6,6 +6,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "cloud_task_executor_example"
+path = "example/main.rs"
+
 [dependencies]
 basic_macros = { path = "src/basic_macros" }
 tokio = { version = "1", features = ["full"] }

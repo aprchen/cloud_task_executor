@@ -75,7 +75,7 @@ impl Executor {
         self.task = Some(task);
     }
 
-    pub fn set_context_initializer<C>(&mut self, initializer: C)
+    pub fn set_initializer<C>(&mut self, initializer: C)
         where
             C: Fn(&Context) + 'static + Send + Sync,
     {
