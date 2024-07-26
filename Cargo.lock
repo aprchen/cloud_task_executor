@@ -172,7 +172,7 @@ name = "cloud_task_executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cte_basic_macros",
+ "cte_basic_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "lambda_runtime",
  "openssl",
@@ -207,6 +207,17 @@ dependencies = [
 [[package]]
 name = "cte_basic_macros"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "cte_basic_macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de496663031ea89d2bded0cf633b9201b240b444615a1c353994d457447dcff6"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -16,7 +16,7 @@ name = "cloud_task_executor_example"
 path = "example/main.rs"
 
 [dependencies]
-cte_basic_macros = { path = "src/cte_basic_macros" }
+cte_basic_macros = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3.30"
 serde = "1.0.143"
