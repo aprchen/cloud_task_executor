@@ -23,14 +23,21 @@ pub fn cte_task(args: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         panic!("Expected name argument");
     };
+
     let fn_name = &input.sig.ident;
     let fn_block = &input.block;
+    let fn_args = &input.sig.inputs;
+
     let expanded = quote! {
         pub fn #fn_name() -> crate::executor::Task {
-            crate::executor::Task::new(#name, |ctx, payload| {
-                Box::pin(async move #fn_block)
+            crate::executor::Task::new(#name, |ctx: crate::executor::Context, payload: serde_json::Value| {
+                Box::pin(async move {
+                    async fn inner(#fn_args) -> Result<String, String> #fn_block
+                    inner(ctx, payload).await
+                })
             })
         }
     };
+
     expanded.into()
 }

@@ -71,7 +71,7 @@ async fn main() {
 }
 
 #[cte_task(name = "test")]
-async fn test(ctx: Context, payload: Value) -> Result<String, String> {
+async fn test(_ctx: Context, _payload: Value) -> Result<String, String> {
     Ok("test".to_string())
 }
 

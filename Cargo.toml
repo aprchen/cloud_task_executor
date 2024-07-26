@@ -1,6 +1,6 @@
 workspace = { members = ["basic_macros"] }
 [package]
-name = "CloudTaskExecutor"
+name = "cloud_task_executor"
 version = "0.1.0"
 edition = "2021"
 
