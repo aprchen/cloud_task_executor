@@ -23,10 +23,8 @@ pub fn cte_task(args: TokenStream, input: TokenStream) -> TokenStream {
     } else {
         panic!("Expected name argument");
     };
-
     let fn_name = &input.sig.ident;
     let fn_block = &input.block;
-
     let expanded = quote! {
         pub fn #fn_name() -> crate::executor::Task {
             crate::executor::Task::new(#name, |ctx, payload| {
@@ -34,6 +32,5 @@ pub fn cte_task(args: TokenStream, input: TokenStream) -> TokenStream {
             })
         }
     };
-
     expanded.into()
 }

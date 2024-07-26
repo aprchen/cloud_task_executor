@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use futures::future::BoxFuture;
 use std::any::Any;
-use lambda_runtime::{service_fn, LambdaEvent, Error};
+use lambda_runtime::{service_fn, LambdaEvent};
 use serde_json::Value;
 use crate::cloud_providers::{handle_lambda_event, create_fc_route};
 
@@ -37,8 +37,8 @@ impl Task {
         }
     }
 
-    pub fn with_wrapper(mut self, wrapper: WrapperFn) -> Self {
-        self.wrappers.push(wrapper);
+    pub fn with_wrapper(mut self, wrapper: &WrapperFn) -> Self {
+        self.wrappers.push(wrapper.clone());
         self
     }
 
@@ -99,10 +99,12 @@ impl Executor {
             executor(&self.context);
         }
     }
+
     pub async fn run(self) {
         for initializer in &self.context_initializers {
             initializer(&self.context);
         }
+
         if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
             let func = service_fn(move |event: LambdaEvent<Value>| {
                 let executor = self.clone();

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-use futures::future::BoxFuture;
 use lambda_runtime::{LambdaEvent, Error};
 use serde_json::Value;
 use warp::hyper::body::Bytes;
