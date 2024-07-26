@@ -59,6 +59,12 @@ pub struct Executor {
     pub(crate) context: Context,
 }
 
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
@@ -101,7 +107,7 @@ impl Executor {
     }
 
     pub async fn execute_task(&self, payload: Option<Value>) -> Result<String, String> {
-        let payload = payload.unwrap_or_else(|| Value::Null);
+        let payload = payload.unwrap_or(Value::Null);
 
         // 调用注册的修改 context 的闭包
         if let Some(action) = &self.pre_action {
@@ -114,14 +120,11 @@ impl Executor {
             Err("No task registered".to_string())
         };
 
-        // 在任务执行完毕后调用后处理函数
-        let result = if let Some(action) = &self.after_action {
+        if let Some(action) = &self.after_action {
             action(&self.context, payload.clone(), result)
         } else {
             result
-        };
-
-        result
+        }
     }
 
     pub async fn run(self) -> Result<String, String> {
