@@ -14,13 +14,14 @@
 //!
 //! ```rust
 //! use cloud_task_executor::*;
-//! use serde_json::Value;
+//! use serde_json::{json,Value};
 //!
 //! #[cte_task(name = "my_task")]
 //! async fn my_task(ctx: Context, payload: Value) -> Result<String, String> {
 //!     let sample_value = ctx.get("sample_key").expect("sample_key not found");
 //!     let payload_str = payload.get("payload_key").and_then(Value::as_str).unwrap_or("default_value");
-//!     println!("Task running with sample value: {}, payload: {}", sample_value, payload_str);
+//!     let runtime = ctx.get(KEY_RUNTIME).unwrap();
+//!     println!("Task running with sample value: {}, payload: {}, runtime {}", sample_value, payload_str, runtime);
 //!     Ok("Task result".to_string())
 //! }
 //!
@@ -34,11 +35,9 @@
 //!         println!("Task executed with payload: {:?}, result: {:?}", payload, result);
 //!         result.map(|res| format!("{} - after action", res))
 //!     });
-//!     executor.set_pre_action(|ctx, payload| {
-//!         if let Some(value) = payload.get("modify_key").and_then(Value::as_str) {
-//!             ctx.set("modified_key", value.to_string());
-//!         }
-//!         ctx.set("my_task","Task result".to_string())
+//!     executor.set_before_action(|ctx, payload| {
+//!        ctx.set("modified_key", "test".to_string());
+//!         json!({"test":1})
 //!     });
 //!     // 注册任务
 //!     executor.register_task(my_task());
@@ -49,7 +48,7 @@ pub mod executor;
 pub mod cloud_providers;
 pub mod args;
 
-pub use executor::{Executor, Task, Context};
+pub use executor::{Executor, Task, Context, RUNTIME_LOCAL, RUNTIME_FC, RUNTIME_LAMBDA, KEY_RUNTIME};
 pub use cloud_providers::{handle_lambda_event, create_fc_route};
 pub use args::Args;
 
@@ -59,7 +58,7 @@ pub use cte_basic_macros::cte_task;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::Value;
+    use serde_json::{json, Value};
 
     fn initialize_executor() -> Executor {
         let mut executor = Executor::new();
@@ -76,11 +75,20 @@ mod tests {
             result.map(|res| format!("{} - after action", res))
         });
 
-        executor.set_pre_action(|ctx, payload| {
+        executor.set_before_action(|ctx, payload| {
             if let Some(value) = payload.get("modify_key").and_then(Value::as_str) {
                 ctx.set("modified_key", value.to_string());
             }
-            ctx.set("my_task","Task result".to_string())
+            ctx.set("my_task", "Task result".to_string());
+            let mut new_payload = json!({"test": 1});
+            if let Value::Object(map) = payload {
+                if let Value::Object(new_map) = &mut new_payload {
+                    for (k, v) in map {
+                        new_map.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            new_payload
         });
 
         executor
@@ -100,11 +108,11 @@ mod tests {
         let mut executor = initialize_executor();
 
         // 初始化上下文
-        if let Some(initializer) = &executor.context_initializer {
+        if let Some(initializer) = &executor.initializer {
             initializer(&executor.context);
         }
 
-        let payload = Some(serde_json::json!({"payload_key": "test_value", "modify_key": "modified_value"}));
+        let payload = Some(json!({"payload_key": "test_value", "modify_key": "modified_value"}));
         let result = executor.execute_task(payload.clone()).await;
 
         {
@@ -121,7 +129,7 @@ mod tests {
         executor = initialize_executor();
 
         // 初始化上下文
-        if let Some(initializer) = &executor.context_initializer {
+        if let Some(initializer) = &executor.initializer {
             initializer(&executor.context);
         }
 

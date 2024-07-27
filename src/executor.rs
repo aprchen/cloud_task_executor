@@ -1,11 +1,18 @@
 use std::collections::HashMap;
+use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use futures::future::BoxFuture;
 use lambda_runtime::{service_fn, LambdaEvent};
+use log::info;
 use serde_json::Value;
 use structopt::StructOpt;
 use crate::cloud_providers::{handle_lambda_event, create_fc_route};
 use crate::args::Args;
+
+pub const RUNTIME_FC: &str = "fc";
+pub const RUNTIME_LAMBDA: &str = "lambda";
+pub const RUNTIME_LOCAL: &str = "local";
+pub const KEY_RUNTIME: &str = "task_runtime";
 
 #[derive(Default)]
 pub struct ContextData {
@@ -14,9 +21,9 @@ pub struct ContextData {
 
 pub type Context = Arc<ContextData>;
 pub type TaskFn = Arc<dyn Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + Send + Sync>;
-pub type ContextInitializer = Arc<dyn Fn(&Context) + Send + Sync>;
+pub type Initializer = Arc<dyn Fn(&Context) + Send + Sync>;
 pub type AfterAction = Arc<dyn Fn(&Context, Value, Result<String, String>) -> Result<String, String> + Send + Sync>;
-pub type PreAction = Arc<dyn Fn(&Context, &Value) + Send + Sync>;
+pub type BeforeAction = Arc<dyn Fn(&Context, &Value) -> Value + Send + Sync>;
 
 #[derive(Clone)]
 pub struct Task {
@@ -26,8 +33,8 @@ pub struct Task {
 
 impl Task {
     pub fn new<T>(name: &str, task_fn: T) -> Self
-        where
-            T: Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + 'static + Send + Sync,
+    where
+        T: Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + 'static + Send + Sync,
     {
         Self {
             name: name.to_string(),
@@ -53,9 +60,9 @@ impl ContextData {
 #[derive(Clone)]
 pub struct Executor {
     task: Option<Task>,
-    pub(crate) context_initializer: Option<ContextInitializer>,
+    pub(crate) initializer: Option<Initializer>,
     after_action: Option<AfterAction>,
-    pre_action: Option<PreAction>,
+    before_action: Option<BeforeAction>,
     pub(crate) context: Context,
 }
 
@@ -69,9 +76,9 @@ impl Executor {
     pub fn new() -> Self {
         Self {
             task: None,
-            context_initializer: None,
+            initializer: None,
             after_action: None,
-            pre_action: None,
+            before_action: None,
             context: Arc::new(ContextData::default()),
         }
     }
@@ -82,24 +89,24 @@ impl Executor {
     }
 
     pub fn set_initializer<C>(&mut self, initializer: C)
-        where
-            C: Fn(&Context) + 'static + Send + Sync,
+    where
+        C: Fn(&Context) + 'static + Send + Sync,
     {
-        self.context_initializer = Some(Arc::new(initializer));
+        self.initializer = Some(Arc::new(initializer));
     }
 
     pub fn set_after_action<E>(&mut self, action: E)
-        where
-            E: Fn(&Context, Value, Result<String, String>) -> Result<String, String> + 'static + Send + Sync,
+    where
+        E: Fn(&Context, Value, Result<String, String>) -> Result<String, String> + 'static + Send + Sync,
     {
         self.after_action = Some(Arc::new(action));
     }
 
-    pub fn set_pre_action<M>(&mut self, action: M)
-        where
-            M: Fn(&Context, &Value) + 'static + Send + Sync,
+    pub fn set_before_action<M>(&mut self, action: M)
+    where
+        M: Fn(&Context, &Value) -> Value + 'static + Send + Sync,
     {
-        self.pre_action = Some(Arc::new(action));
+        self.before_action = Some(Arc::new(action));
     }
 
     fn handle_args(&self) -> Args {
@@ -107,11 +114,10 @@ impl Executor {
     }
 
     pub async fn execute_task(&self, payload: Option<Value>) -> Result<String, String> {
-        let payload = payload.unwrap_or(Value::Null);
+        let mut payload: Value = payload.unwrap_or(Value::Null);
 
-        // 调用注册的修改 context 的闭包
-        if let Some(action) = &self.pre_action {
-            action(&self.context, &payload);
+        if let Some(action) = &self.before_action {
+            payload = action(&self.context, &payload);
         }
 
         let result = if let Some(task) = &self.task {
@@ -128,10 +134,11 @@ impl Executor {
     }
 
     pub async fn run(self) -> Result<String, String> {
-        if let Some(initializer) = &self.context_initializer {
+        self.context.set(KEY_RUNTIME, get_runtime());
+
+        if let Some(initializer) = &self.initializer {
             initializer(&self.context);
         }
-
         if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
             let func = service_fn(move |event: LambdaEvent<Value>| {
                 let executor = self.clone();
@@ -147,10 +154,20 @@ impl Executor {
             Ok("FC function executed".to_string())
         } else {
             // 本地开发环境
-            println!("Running in local development environment");
+            info!("Running in local development environment");
             let args = self.handle_args();
             let result = self.execute_task(args.payload).await;
             Ok(result.unwrap_or_else(|err| err))
         }
+    }
+}
+
+pub fn get_runtime() -> String {
+    if std::env::var("FC_FUNC_CODE_PATH").is_ok() {
+        RUNTIME_FC.to_string()
+    } else if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
+        RUNTIME_LAMBDA.to_string()
+    } else {
+        RUNTIME_LOCAL.to_string()
     }
 }

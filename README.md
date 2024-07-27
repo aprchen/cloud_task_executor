@@ -16,7 +16,7 @@ The Cloud Task Executor is built around a modular architecture that includes the
 
 1. Task: A unit of work that can be executed with a specific context and payload. Tasks are defined using a custom procedural macro for easy registration.
 2. Context: A thread-safe, shared data store used to maintain state across task executions. The context can be modified by pre-actions and accessed during task execution.
-3.	Pre-Action: A closure that modifies the context or payload before the main task execution.
+3.	Before-Action: A closure that modifies the context or payload before the main task execution.
 4.	After-Action: A closure that processes the result of the task execution and can modify the final output.
 5.	Executor: The core component responsible for managing task registration, context initialization, pre- and post-actions, and task execution across different environments.
 
@@ -42,24 +42,31 @@ Tasks are registered using a custom procedural macro cte_task. This macro simpli
 async fn my_task(ctx: Context, payload: Value) -> Result<String, String> {
     let sample_value = ctx.get("sample_key").expect("sample_key not found");
     let payload_str = payload.get("payload_key").and_then(Value::as_str).unwrap_or("default_value");
-    println!("Task running with sample value: {}, payload: {}", sample_value, payload_str);
+    let runtime = ctx.get(KEY_RUNTIME).unwrap();
+    println!("Task running with sample value: {}, payload: {}, runtime {}", sample_value, payload_str, runtime);
     Ok("Task result".to_string())
 }
 ```
 ### Setting Up the Executor
-The executor is set up with context initializers, pre-actions, after-actions, and tasks.
+The executor is set up with context initializers, before-actions, after-actions, and tasks.
 ```rust
 let mut executor = Executor::new();
 
-executor.set_context_initializer(|ctx| {
+executor.set_initializer(|ctx| {
 ctx.set("sample_key", "sample_value".to_string());
 });
 
-executor.set_pre_action(|ctx, payload| {
-let mut context = ctx;
-if let Some(value) = payload.get("modify_key").and_then(Value::as_str) {
-context.set("modified_key", value.to_string());
-}
+executor.set_before_action(|ctx, payload| {
+    ctx.set("modified_key", "test".to_string());
+    let mut new_payload = json!({"test": 1});
+    if let Value::Object(map) = payload {
+        if let Value::Object(new_map) = &mut new_payload {
+            for (k, v) in map {
+                new_map.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    new_payload
 });
 
 executor.set_after_action(|ctx, payload, result| {

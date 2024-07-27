@@ -1,7 +1,7 @@
 workspace = { members = ["src/cte_basic_macros"] }
 [package]
 name = "cloud_task_executor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["aprchen <ott321@yeah.net>"]
 description = "The Cloud Task Executor is a versatile and powerful framework designed to simplify the execution of tasks in cloud environments such as AWS Lambda and Alibaba Cloud Function Compute (FC). It provides a unified interface for registering and executing tasks, managing execution contexts, and handling pre- and post-execution actions. This flexibility allows developers to focus on the core logic of their tasks without worrying about the underlying cloud infrastructure."
@@ -27,5 +27,4 @@ openssl = { version = "0.10", features = ["vendored"] }
 anyhow = "1.0.80"
 lambda_runtime = "0.13.0"
 warp = "0.3"
-quote = "1.0.36"
-syn = "2.0.72"
+log = "0.4.22"

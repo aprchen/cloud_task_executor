@@ -169,18 +169,17 @@ dependencies = [
 
 [[package]]
 name = "cloud_task_executor"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cte_basic_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "lambda_runtime",
+ "log",
  "openssl",
- "quote",
  "serde",
  "serde_json",
  "structopt",
- "syn 2.0.72",
  "tokio",
  "warp",
 ]
