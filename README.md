@@ -75,7 +75,7 @@ println!("Task executed with payload: {:?}, result: {:?}", payload, result);
 result.map(|res| format!("{} - after action", res))
 });
 
-executor.register_task(my_task());
+executor.set_task(my_task());
 ```
 ### Running the Executor
 The executor can be run in different environments, including local development, AWS Lambda, and Alibaba Cloud FC.

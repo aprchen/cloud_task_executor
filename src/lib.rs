@@ -40,7 +40,7 @@
 //!         json!({"test":1})
 //!     });
 //!     // 注册任务
-//!     executor.register_task(my_task());
+//!     executor.set_task(my_task());
 //!     executor.run().await.expect("Executor failed to run");
 //! }
 //! ```
@@ -68,7 +68,7 @@ mod tests {
         });
 
         // 注册任务
-        executor.register_task(my_task());
+        executor.set_task(my_task());
 
         executor.set_after_action(|_ctx, payload, result| {
             println!("Task executed with payload: {:?}, result: {:?}", payload, result);

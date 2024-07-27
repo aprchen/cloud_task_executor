@@ -30,7 +30,6 @@ async fn main() {
         }
         new_payload
     });
-
-    executor.register_task(my_task());
+    executor.set_task(my_task());
     executor.run().await.expect("Executor failed to run");
 }

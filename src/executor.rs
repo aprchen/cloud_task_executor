@@ -23,7 +23,7 @@ pub type Context = Arc<ContextData>;
 pub type TaskFn = Arc<dyn Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + Send + Sync>;
 pub type Initializer = Arc<dyn Fn(&Context) + Send + Sync>;
 pub type AfterAction = Arc<dyn Fn(&Context, Value, Result<String, String>) -> Result<String, String> + Send + Sync>;
-pub type BeforeAction = Arc<dyn Fn(&Context, &Value) -> Value + Send + Sync>;
+pub type BeforeAction = Arc<dyn Fn(&Context, Value) -> Value + Send + Sync>;
 
 #[derive(Clone)]
 pub struct Task {
@@ -83,7 +83,7 @@ impl Executor {
         }
     }
 
-    pub fn register_task(&mut self, task: Task) {
+    pub fn set_task(&mut self, task: Task) {
         self.context.set("task_name", task.name.clone());
         self.task = Some(task);
     }
@@ -104,7 +104,7 @@ impl Executor {
 
     pub fn set_before_action<M>(&mut self, action: M)
     where
-        M: Fn(&Context, &Value) -> Value + 'static + Send + Sync,
+        M: Fn(&Context, Value) -> Value + 'static + Send + Sync,
     {
         self.before_action = Some(Arc::new(action));
     }
@@ -117,7 +117,7 @@ impl Executor {
         let mut payload: Value = payload.unwrap_or(Value::Null);
 
         if let Some(action) = &self.before_action {
-            payload = action(&self.context, &payload);
+            payload = action(&self.context, payload);
         }
 
         let result = if let Some(task) = &self.task {
