@@ -25,7 +25,7 @@ The Cloud Task Executor can be easily integrated into your Rust projects using t
 
 ```toml
 [dependencies]
-cloud_task_executor = "0.1.0"
+cloud_task_executor = "0.1.2"
 ```
 
 Next, import the crate into your project:
@@ -102,4 +102,3 @@ This description should provide a clear and comprehensive overview of your proje
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
-```
