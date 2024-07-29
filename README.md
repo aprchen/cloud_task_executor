@@ -26,7 +26,7 @@ The Cloud Task Executor can be easily integrated into your Rust projects using t
 
 ```toml
 [dependencies]
-cloud_task_executor = "0.1.2"
+cloud_task_executor = "0.1.3"
 ```
 
 Next, import the crate into your project:
