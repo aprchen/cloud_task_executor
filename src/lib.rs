@@ -48,7 +48,7 @@ pub mod executor;
 pub mod cloud_providers;
 pub mod args;
 
-pub use executor::{Executor, Task, Context, RUNTIME_LOCAL, RUNTIME_FC, RUNTIME_LAMBDA, KEY_RUNTIME};
+pub use executor::{Executor, Task, Context, Runtime, KEY_RUNTIME};
 pub use cloud_providers::{handle_lambda_event, create_fc_route};
 pub use args::Args;
 
@@ -134,7 +134,6 @@ mod tests {
         }
 
         let result = executor.execute_task(None).await;
-
         {
             let context = &executor.context;
             let result_value = context.get("my_task").expect("Result not found");

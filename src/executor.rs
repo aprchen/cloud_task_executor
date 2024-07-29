@@ -1,17 +1,31 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::string::ToString;
 use std::sync::{Arc, Mutex};
 use futures::future::BoxFuture;
 use lambda_runtime::{service_fn, LambdaEvent};
-use log::info;
 use serde_json::Value;
 use structopt::StructOpt;
 use crate::cloud_providers::{handle_lambda_event, create_fc_route};
 use crate::args::Args;
 
-pub const RUNTIME_FC: &str = "fc";
-pub const RUNTIME_LAMBDA: &str = "lambda";
-pub const RUNTIME_LOCAL: &str = "local";
+pub enum Runtime {
+    FC,
+    Lambda,
+    Local,
+}
+
+impl Display for Runtime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Runtime::FC => "fc".to_string(),
+            Runtime::Lambda => "lambda".to_string(),
+            Runtime::Local => "local".to_string(),
+        };
+        write!(f, "{}", str)
+    }
+}
+
 pub const KEY_RUNTIME: &str = "task_runtime";
 
 #[derive(Default)]
@@ -134,40 +148,41 @@ impl Executor {
     }
 
     pub async fn run(self) -> Result<String, String> {
-        self.context.set(KEY_RUNTIME, get_runtime());
-
+        self.context.set(KEY_RUNTIME, get_runtime().to_string());
         if let Some(initializer) = &self.initializer {
             initializer(&self.context);
         }
-        if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
-            let func = service_fn(move |event: LambdaEvent<Value>| {
-                let executor = self.clone();
-                async move {
-                    handle_lambda_event(executor, event).await
-                }
-            });
-            lambda_runtime::run(func).await.expect("Failed to run AWS Lambda function");
-            Ok("AWS Lambda function executed".to_string())
-        } else if std::env::var("FC_FUNC_CODE_PATH").is_ok() {
-            let route = create_fc_route(self);
-            warp::serve(route).run(([0, 0, 0, 0], 9000)).await;
-            Ok("FC function executed".to_string())
-        } else {
-            // 本地开发环境
-            info!("Running in local development environment");
-            let args = self.handle_args();
-            let result = self.execute_task(args.payload).await;
-            Ok(result.unwrap_or_else(|err| err))
+        match get_runtime() {
+            Runtime::FC => {
+                let route = create_fc_route(self);
+                warp::serve(route).run(([0, 0, 0, 0], 9000)).await;
+                Ok("FC function executed".to_string())
+            }
+            Runtime::Lambda => {
+                let func = service_fn(move |event: LambdaEvent<Value>| {
+                    let executor = self.clone();
+                    async move {
+                        handle_lambda_event(executor, event).await
+                    }
+                });
+                lambda_runtime::run(func).await.expect("Failed to run AWS Lambda function");
+                Ok("AWS Lambda function executed".to_string())
+            }
+            Runtime::Local => {
+                let args = self.handle_args();
+                let result = self.execute_task(args.payload).await;
+                Ok(result.unwrap_or_else(|err| err))
+            }
         }
     }
 }
 
-pub fn get_runtime() -> String {
-    if std::env::var("FC_FUNC_CODE_PATH").is_ok() {
-        RUNTIME_FC.to_string()
-    } else if std::env::var("LAMBDA_TASK_ROOT").is_ok() {
-        RUNTIME_LAMBDA.to_string()
+pub fn get_runtime() -> Runtime {
+    if std::env::var("FC_REGION").is_ok() {
+        Runtime::FC
+    } else if std::env::var("AWS_REGION").is_ok() {
+        Runtime::Lambda
     } else {
-        RUNTIME_LOCAL.to_string()
+        Runtime::Local
     }
 }
