@@ -2,6 +2,7 @@ use crate::executor::Executor;
 use lambda_runtime::{Error, LambdaEvent};
 use serde_json::{json, Value};
 use std::borrow::Cow;
+use log::debug;
 use warp::hyper::body::Bytes;
 use warp::{Filter, Rejection};
 use warp::Reply;
@@ -24,7 +25,7 @@ pub async fn handle_fc_request(
 ) -> Result<impl Reply, Rejection> {
     let body_str: Cow<str> = String::from_utf8_lossy(&body);
     let mut payload: Value = serde_json::from_str(&body_str).unwrap_or(Value::Null);
-
+    debug!("Received FC request: {:?}", payload);
     // 提取 payload 内的值并合并到顶层，并移除原始 payload 键，抹平sdk invoke和scheduler invoke 的差异
     if let Some(inner_payload) = payload.get("payload").cloned() {
         if let Some(inner_map) = inner_payload.as_object() {
@@ -34,7 +35,7 @@ pub async fn handle_fc_request(
         }
         payload.as_object_mut().unwrap().remove("payload");
     }
-
+    debug!("Transformed FC request: {:?}", payload);
     let result = executor.execute_task(Some(payload)).await;
     match result {
         Ok(data) => Ok(warp::reply::json(&json!({ "status": "success", "data": data }))),
@@ -44,7 +45,7 @@ pub async fn handle_fc_request(
 
 pub fn create_fc_route(
     executor: Executor,
-) -> impl Filter<Extract=impl Reply, Error=warp::Rejection> + Clone {
+) -> impl Filter<Extract=impl Reply, Error=Rejection> + Clone {
     warp::post()
         .and(warp::path("invoke"))
         .and(warp::body::bytes())
