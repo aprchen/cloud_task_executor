@@ -28,16 +28,26 @@ impl Display for Runtime {
 
 pub const KEY_RUNTIME: &str = "task_runtime";
 
-#[derive(Default)]
-pub struct ContextData {
-    pub data: Mutex<HashMap<String, String>>,
-}
-
-pub type Context = Arc<ContextData>;
 pub type TaskFn = Arc<dyn Fn(Context, Value) -> BoxFuture<'static, Result<String, String>> + Send + Sync>;
 pub type Initializer = Arc<dyn Fn(&Context) + Send + Sync>;
 pub type AfterAction = Arc<dyn Fn(&Context, Value, Result<String, String>) -> Result<String, String> + Send + Sync>;
 pub type BeforeAction = Arc<dyn Fn(&Context, Value) -> Value + Send + Sync>;
+
+#[derive(Default,Clone)]
+pub struct Context {
+    pub data: Arc<Mutex<HashMap<String, String>>>,
+}
+
+impl Context {
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.data.lock().expect("get lock failed").get(key).cloned()
+    }
+
+    pub fn set(&self, key: &str, value: String) {
+        self.data.lock().expect("set lock failed").insert(key.to_string(), value);
+    }
+}
+
 
 #[derive(Clone)]
 pub struct Task {
@@ -58,16 +68,6 @@ impl Task {
 
     pub async fn execute(&self, ctx: Context, payload: Value) -> Result<String, String> {
         (self.task_fn)(ctx, payload).await
-    }
-}
-
-impl ContextData {
-    pub fn get(&self, key: &str) -> Option<String> {
-        self.data.lock().expect("get lock failed").get(key).cloned()
-    }
-
-    pub fn set(&self, key: &str, value: String) {
-        self.data.lock().expect("set lock failed").insert(key.to_string(), value);
     }
 }
 
@@ -93,7 +93,7 @@ impl Executor {
             initializer: None,
             after_action: None,
             before_action: None,
-            context: Arc::new(ContextData::default()),
+            context: Context::default(),
         }
     }
 
