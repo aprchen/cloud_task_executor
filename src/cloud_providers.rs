@@ -27,13 +27,16 @@ pub async fn handle_fc_request(
     let mut payload: Value = serde_json::from_str(&body_str).unwrap_or(Value::Null);
     debug!("Received FC request: {:?}", payload);
     // 提取 payload 内的值并合并到顶层，并移除原始 payload 键，抹平sdk invoke和scheduler invoke 的差异
-    if let Some(inner_payload) = payload.get("payload").cloned() {
-        if let Some(inner_map) = inner_payload.as_object() {
-            for (key, value) in inner_map {
-                payload[key] = value.clone();
+    if let Some(payload_str) = payload.get("payload").and_then(|v| v.as_str()) {
+        if let Ok(parsed_payload) = serde_json::from_str::<Value>(payload_str) {
+            // 提取 payload 内的值并合并到顶层，并移除原始 payload 键
+            if let Some(inner_map) = parsed_payload.as_object() {
+                for (key, value) in inner_map {
+                    payload[key] = value.clone();
+                }
             }
+            payload.as_object_mut().unwrap().remove("payload");
         }
-        payload.as_object_mut().unwrap().remove("payload");
     }
     debug!("Transformed FC request: {:?}", payload);
     let result = executor.execute_task(Some(payload)).await;
